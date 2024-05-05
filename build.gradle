@@ -1,0 +1,41 @@
+plugins {
+    id 'java'
+}
+
+group 'com.github.TannerLow'
+version '1.0'
+description 'Matrix Library with GPU compatibility.'
+
+repositories {
+    mavenCentral()
+    maven { url "https://jitpack.io" }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_16
+    targetCompatibility = JavaVersion.VERSION_16
+}
+
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+
+    // https://mvnrepository.com/artifact/org.jocl/jocl
+    implementation group: 'org.jocl', name: 'jocl', version: '2.0.5'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+jar {
+    manifest {
+        attributes(
+            'Class-Path': configurations.runtimeClasspath.collect { it.name }.join(' ')
+        )
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
