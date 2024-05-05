@@ -3,7 +3,7 @@ plugins {
 }
 
 group 'com.github.TannerLow'
-version '1.0'
+version '0.0'
 description 'Matrix Library with GPU compatibility.'
 
 repositories {
