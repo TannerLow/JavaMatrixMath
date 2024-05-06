@@ -1,4 +1,4 @@
-package com.github.TannerLow;
+package com.github.TannerLow.JavaMatrixMath;
 
 import java.io.InputStream;
 

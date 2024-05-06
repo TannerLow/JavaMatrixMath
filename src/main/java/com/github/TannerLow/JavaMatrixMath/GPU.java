@@ -1,8 +1,7 @@
-package com.github.TannerLow;
+package com.github.TannerLow.JavaMatrixMath;
 
 import org.jocl.CL;
 import org.jocl.Pointer;
-import org.jocl.Sizeof;
 import org.jocl.cl_command_queue;
 import org.jocl.cl_context;
 import org.jocl.cl_context_properties;
@@ -37,7 +36,6 @@ import static org.jocl.CL.clReleaseCommandQueue;
 import static org.jocl.CL.clReleaseContext;
 import static org.jocl.CL.clReleaseKernel;
 import static org.jocl.CL.clReleaseProgram;
-import static org.jocl.CL.clSetKernelArg;
 
 public class GPU implements Closeable {
     private static final long deviceType = CL_DEVICE_TYPE_GPU;
@@ -159,12 +157,12 @@ public class GPU implements Closeable {
         return programs.size()-1;
     }
 
-    public boolean loadKernel(int programId, String programName, String kernelName) {
+    public boolean loadKernel(int programId, String scopeName, String kernelName) {
         if(programId >= programs.size() && programId < 0) {
             return false;
         }
 
-        String scopedKernelName = programName + "::" + kernelName;
+        String scopedKernelName = scopeName + "::" + kernelName;
 
         if(kernels.containsKey(scopedKernelName)) {
             throw new InvalidParameterException("Kernel of that name and scope already exists on GPU.");

@@ -1,5 +1,6 @@
-package com.github.TannerLow;
+package com.github.TannerLow.JavaMatrixMath;
 
+import com.github.TannerLow.JavaMatrixMath.Exceptions.DimensionsMismatchException;
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
 import org.jocl.cl_command_queue;
@@ -39,9 +40,11 @@ public class Matrix {
         }
     }
 
-    public Matrix multiply(Matrix other) {
+    public Matrix multiply(Matrix other) throws DimensionsMismatchException {
         if(cols != other.rows) {
-            return null;
+            final int[] dimensionsA = {rows, cols};
+            final int[] dimensionsB = {other.rows, other.cols};
+            throw new DimensionsMismatchException(dimensionsA, dimensionsB);
         }
 
         Matrix result = new Matrix(rows, other.cols);
@@ -54,6 +57,35 @@ public class Matrix {
                 }
                 result.data[row * result.rows + otherCol] = sum;
             }
+        }
+
+        return result;
+    }
+
+    public Matrix addRowToRows(Matrix row) throws DimensionsMismatchException {
+        if(cols != row.cols) {
+            final int[] dimensionsA = {rows, cols};
+            final int[] dimensionsB = {row.rows, row.cols};
+            throw new DimensionsMismatchException(dimensionsA, dimensionsB);
+        }
+
+        Matrix result = new Matrix(rows, cols);
+
+        for(int currentRow = 0; currentRow < rows; currentRow++) {
+            for(int col = 0; col < cols; col++) {
+                int index = currentRow * cols + col;
+                result.data[index] = data[index] + row.data[col];
+            }
+        }
+
+        return result;
+    }
+
+    public Matrix relu() {
+        Matrix result = new Matrix(rows, cols);
+
+        for(int i = 0; i < data.length; i++) {
+            result.data[i] = Math.max(data[i], 0);
         }
 
         return result;
