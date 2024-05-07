@@ -3,19 +3,13 @@ plugins {
 }
 
 group 'com.github.TannerLow'
-version '0.2'
+version '0.3'
 description 'Matrix Library with GPU compatibility.'
 
 repositories {
     mavenCentral()
     maven { url "https://jitpack.io" }
 }
-
-//java {
-//    sourceCompatibility = JavaVersion.VERSION_16
-//    targetCompatibility = JavaVersion.VERSION_16
-//}
-
 
 dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'

@@ -145,7 +145,11 @@ public class GPU implements Closeable {
         isInitialized = true;
     }
 
-    public int loadProgram(String programCode) {
+    public int loadProgram(String programCode) throws IllegalStateException {
+        if(!isInitialized) {
+            throw new IllegalStateException("GPU not yet initialized.");
+        }
+
         // Create the program from the source code
         cl_program program = clCreateProgramWithSource(context,
                 1, new String[]{ programCode }, null, null);
@@ -208,8 +212,13 @@ public class GPU implements Closeable {
             clReleaseProgram(program);
         }
 
-        clReleaseCommandQueue(commandQueue);
-        clReleaseContext(context);
+        if(commandQueue != null) {
+            clReleaseCommandQueue(commandQueue);
+        }
+
+        if(context != null) {
+            clReleaseContext(context);
+        }
     }
 
     private static String getStringInfo(cl_platform_id platform, int paramName) {
