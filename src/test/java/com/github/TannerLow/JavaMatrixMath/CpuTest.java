@@ -8,6 +8,7 @@ public class CpuTest {
         testMultiply();
         testAddRowToRows();
         testRelu();
+        testSoftmax();
     }
 
     private static void testMultiply() {
@@ -59,6 +60,25 @@ public class CpuTest {
         Matrix m = new Matrix(2, 2, data);
 
         Matrix result = m.relu();
+
+        if(result.rows != m.rows || result.cols != m.cols) {
+            throw new TestFailedException();
+        }
+
+        for(int i = 0; i < result.data.length; i++) {
+            if(!TestMath.withinMariginOfError(expected[i], result.data[i], 0.0005f)) {
+                throw new TestFailedException();
+            }
+        }
+    }
+
+    private static void testSoftmax() {
+        float[] data = {1.1f,2.2f,0.2f,-1.7f};
+        float[] expected = {0.223636f,0.671841f,0.090923f,0.013599f};
+
+        Matrix m = new Matrix(1, 4, data);
+
+        Matrix result = m.softmax();
 
         if(result.rows != m.rows || result.cols != m.cols) {
             throw new TestFailedException();

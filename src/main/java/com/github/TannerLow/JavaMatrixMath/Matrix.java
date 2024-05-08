@@ -91,6 +91,38 @@ public class Matrix {
         return result;
     }
 
+    public Matrix softmax() {
+        Matrix result = new Matrix(rows, cols);
+
+        float[] buffer = new float[rows];
+        for(int row = 0; row < rows; row++) {
+            int offset = row * cols;
+
+            // calculate the max values
+            buffer[row] = -Float.MAX_VALUE;
+            for(int i = 0; i < cols; i++) {
+                float value = data[offset + i];
+                if(value > buffer[row]) {
+                    buffer[row] = value;
+                }
+            }
+
+            // calculate the sums
+            float sum = 0;
+            float max = buffer[row];
+            for(int i = 0; i < cols; i++) {
+                sum += Math.exp(data[offset + i] - max);
+            }
+
+            // calculate the softmax vectors
+            for(int i = 0; i < cols; i++) {
+                result.data[offset + i] = (float) (Math.exp(data[offset + i] - max) / sum);
+            }
+        }
+
+        return result;
+    }
+
     public static boolean isCompatibleWithGPU(GPU gpu) {
         return  gpu.isInitialized() &&
                 gpu.getKernel("Matrices::matrixMultiply") != null &&
@@ -222,13 +254,13 @@ public class Matrix {
 
         Matrix result = new Matrix(rows, cols);
 
-        Pointer pointerA = Pointer.to(data);
+        Pointer pointerIn = Pointer.to(data);
         Pointer pointerOut = Pointer.to(result.data);
 
         // Allocate the memory objects for the input- and output data
-        cl_mem memoryA = clCreateBuffer(context,
+        cl_mem memoryIn = clCreateBuffer(context,
                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                Sizeof.cl_float * data.length, pointerA, null);
+                Sizeof.cl_float * data.length, pointerIn, null);
         cl_mem memoryOut = clCreateBuffer(context,
                 CL_MEM_READ_WRITE,
                 Sizeof.cl_float * result.data.length, null, null);
@@ -236,7 +268,7 @@ public class Matrix {
         // Set the arguments for the kernel
         int argNum = 0;
         clSetKernelArg(kernel, argNum++, Sizeof.cl_mem, Pointer.to(memoryOut));
-        clSetKernelArg(kernel, argNum++, Sizeof.cl_mem, Pointer.to(memoryA));
+        clSetKernelArg(kernel, argNum++, Sizeof.cl_mem, Pointer.to(memoryIn));
         clSetKernelArg(kernel, argNum++, Sizeof.cl_uint, Pointer.to(new int[]{cols}));
 
         // Set the work-item dimensions
@@ -251,7 +283,53 @@ public class Matrix {
         clEnqueueReadBuffer(commandQueue, memoryOut, CL_TRUE, 0,
                 result.data.length * Sizeof.cl_float, pointerOut, 0, null, null);
 
-        clReleaseMemObject(memoryA);
+        clReleaseMemObject(memoryIn);
+        clReleaseMemObject(memoryOut);
+
+        return result;
+    }
+
+    public Matrix softmax(GPU gpu) {
+        cl_context context = gpu.getContext();
+        cl_command_queue commandQueue = gpu.getCommandQueue();
+        cl_kernel kernel = gpu.getKernel("Matrices::softmax");
+
+        if(kernel == null) {
+            return null;
+        }
+
+        Matrix result = new Matrix(rows, cols);
+
+        Pointer pointerIn = Pointer.to(data);
+        Pointer pointerOut = Pointer.to(result.data);
+
+        // Allocate the memory objects for the input- and output data
+        cl_mem memoryIn = clCreateBuffer(context,
+                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                Sizeof.cl_float * data.length, pointerIn, null);
+        cl_mem memoryOut = clCreateBuffer(context,
+                CL_MEM_READ_WRITE,
+                Sizeof.cl_float * result.data.length, null, null);
+
+        // Set the arguments for the kernel
+        int argNum = 0;
+        clSetKernelArg(kernel, argNum++, Sizeof.cl_mem, Pointer.to(memoryOut));
+        clSetKernelArg(kernel, argNum++, Sizeof.cl_mem, Pointer.to(memoryIn));
+        clSetKernelArg(kernel, argNum++, Sizeof.cl_uint, Pointer.to(new int[]{cols}));
+
+        // Set the work-item dimensions
+        long local_work_sizes[] = new long[]{1};
+        long global_work_sizes[] = new long[]{rows};
+
+        // Execute the kernel
+        clEnqueueNDRangeKernel(commandQueue, kernel, 1, null,
+                global_work_sizes, local_work_sizes, 0, null, null);
+
+        // Read the output data
+        clEnqueueReadBuffer(commandQueue, memoryOut, CL_TRUE, 0,
+                result.data.length * Sizeof.cl_float, pointerOut, 0, null, null);
+
+        clReleaseMemObject(memoryIn);
         clReleaseMemObject(memoryOut);
 
         return result;

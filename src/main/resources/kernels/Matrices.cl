@@ -62,10 +62,10 @@ addRowToRows(__global float* C,
     }
 }
 
-// Add row to rows: C = ReLu(A).
+// Add row to rows: output = ReLu(A).
 __kernel void
-relu(__global float* C,
-     __global float* A,
+relu(__global float* output,
+     __global float* input,
      const int rowSize)
 {
     int globalRow = get_global_id(0);
@@ -75,13 +75,46 @@ relu(__global float* C,
     {
         int index = globalRow * rowSize + i;
 
-        // C[i] = max(C[i], 0)
-        float value = A[index];
+        // output[i] = max(output[i], 0)
+        float value = input[index];
         float newValue = 0;
         if(value > 0) {
             newValue = value;
         }
 
-        C[index] = newValue;
+        output[index] = newValue;
+    }
+}
+
+// Add row to rows: C = exp(A[i]) for all rows i.
+__kernel void softmax(__global float* output,
+                      __global float* input,
+                      const int rowSize)
+{
+    int globalRow = get_global_id(0);
+
+    int offset = globalRow * rowSize;
+
+    // get the max value of the row
+    float max = -3.4028235E37f;
+    float value;
+    for (int i = 0; i < rowSize; i++) {
+        value = input[offset + i];
+        if(value > max) {
+            max = value;
+        }
+    }
+
+    // Calculate sum of exponentials of input elements
+    float sum = 0.0f;
+    for (int i = 0; i < rowSize; i++) {
+        sum += exp(input[offset + i] - max);
+    }
+
+    // Calculate softmax for each element
+    int index;
+    for (int i = 0; i < rowSize; i++) {
+        index = offset + i;
+        output[index] = exp(input[index] - max) / sum;
     }
 }

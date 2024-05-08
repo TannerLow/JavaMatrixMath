@@ -18,6 +18,7 @@ public class GpuTest {
             testMultiply();
             testAddRowToRows();
             testRelu();
+            testSoftmax();
         }
     }
 
@@ -34,6 +35,7 @@ public class GpuTest {
         gpu.loadKernel(programId, "Matrices", "matrixMultiply");
         gpu.loadKernel(programId, "Matrices", "addRowToRows");
         gpu.loadKernel(programId, "Matrices", "relu");
+        gpu.loadKernel(programId, "Matrices", "softmax");
 
         if(!gpu.isInitialized()) {
             throw new IllegalStateException("GPU in unexpected state.");
@@ -96,6 +98,26 @@ public class GpuTest {
 
         for(int i = 0; i < result.data.length; i++) {
             if(!TestMath.withinMariginOfError(expected[i], result.data[i], 0.0005f)) {
+                throw new TestFailedException();
+            }
+        }
+    }
+
+    private static void testSoftmax() {
+        float[] data = {1.1f,2.2f,0.2f,-1.7f};
+        float[] expected = {0.223636f,0.671841f,0.090923f,0.013599f};
+
+        Matrix m = new Matrix(1, 4, data);
+
+        Matrix result = m.softmax(gpu);
+
+        if(result.rows != m.rows || result.cols != m.cols) {
+            throw new TestFailedException();
+        }
+
+        for(int i = 0; i < result.data.length; i++) {
+            if(!TestMath.withinMariginOfError(expected[i], result.data[i], 0.0005f)) {
+                System.out.println(expected[i] + " vs. " + result.data[i]);
                 throw new TestFailedException();
             }
         }
