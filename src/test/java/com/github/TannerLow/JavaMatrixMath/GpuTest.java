@@ -19,7 +19,8 @@ public class GpuTest {
             testAddRowToRows();
             testAddColToCols();
             testRelu();
-            testSoftmax();
+            testHorizontalSoftmax();
+            testVerticalSoftmax();
         }
     }
 
@@ -35,10 +36,12 @@ public class GpuTest {
         int programId = gpu.loadProgram(matricesKernelCode);
         gpu.loadKernel(programId, "Matrices", "matrixMultiply");
         gpu.loadKernel(programId, "Matrices", "addRowToRows");
+        gpu.loadKernel(programId, "Matrices", "addColToCols");
         gpu.loadKernel(programId, "Matrices", "relu");
-        gpu.loadKernel(programId, "Matrices", "softmax");
+        gpu.loadKernel(programId, "Matrices", "horizontalSoftmax");
+        gpu.loadKernel(programId, "Matrices", "verticalSoftmax");
 
-        if(!gpu.isInitialized()) {
+        if(!gpu.isInitialized() || !Matrix.isCompatibleWithGPU(gpu)) {
             throw new IllegalStateException("GPU in unexpected state.");
         }
     }
@@ -93,7 +96,7 @@ public class GpuTest {
         Matrix a = new Matrix(3,2, aData);
         Matrix b = new Matrix(3,1, bData);
 
-        Matrix result = a.addColToCols(b);
+        Matrix result = a.addColToCols(gpu, b);
 
         if(result.rows != a.rows || result.cols != a.cols) {
             throw new TestFailedException();
@@ -125,13 +128,33 @@ public class GpuTest {
         }
     }
 
-    private static void testSoftmax() {
+    private static void testHorizontalSoftmax() {
         float[] data = {1.1f,2.2f,0.2f,-1.7f};
         float[] expected = {0.223636f,0.671841f,0.090923f,0.013599f};
 
         Matrix m = new Matrix(1, 4, data);
 
-        Matrix result = m.softmax(gpu);
+        Matrix result = m.horizontalSoftmax(gpu);
+
+        if(result.rows != m.rows || result.cols != m.cols) {
+            throw new TestFailedException();
+        }
+
+        for(int i = 0; i < result.data.length; i++) {
+            if(!TestMath.withinMariginOfError(expected[i], result.data[i], 0.0005f)) {
+                System.out.println(expected[i] + " vs. " + result.data[i]);
+                throw new TestFailedException();
+            }
+        }
+    }
+
+    private static void testVerticalSoftmax() {
+        float[] data = {1.1f,2.2f,0.2f,-1.7f};
+        float[] expected = {0.223636f,0.671841f,0.090923f,0.013599f};
+
+        Matrix m = new Matrix(4, 1, data);
+
+        Matrix result = m.verticalSoftmax(gpu);
 
         if(result.rows != m.rows || result.cols != m.cols) {
             throw new TestFailedException();

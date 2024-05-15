@@ -122,7 +122,7 @@ public class Matrix {
         return result;
     }
 
-    public Matrix softmax() {
+    public Matrix horizontalSoftmax() {
         Matrix result = new Matrix(rows, cols);
 
         float[] buffer = new float[rows];
@@ -148,6 +148,37 @@ public class Matrix {
             // calculate the softmax vectors
             for(int i = 0; i < cols; i++) {
                 result.data[offset + i] = (float) (Math.exp(data[offset + i] - max) / sum);
+            }
+        }
+
+        return result;
+    }
+
+    public Matrix verticalSoftmax() {
+        Matrix result = new Matrix(rows, cols);
+
+        float[] buffer = new float[cols];
+        for(int col = 0; col < cols; col++) {
+            // calculate the max values
+            buffer[col] = -Float.MAX_VALUE;
+            for(int i = 0; i < rows; i++) {
+                float value = data[col + i * cols];
+                if(value > buffer[col]) {
+                    buffer[col] = value;
+                }
+            }
+
+            // calculate the sums
+            float sum = 0;
+            float max = buffer[col];
+            for(int i = 0; i < rows; i++) {
+                sum += Math.exp(data[col + i * cols] - max);
+            }
+
+            // calculate the softmax vectors
+            for(int i = 0; i < rows; i++) {
+                int index = col + i * cols;
+                result.data[index] = (float) (Math.exp(data[index] - max) / sum);
             }
         }
 
@@ -187,12 +218,17 @@ public class Matrix {
         return  gpu.isInitialized() &&
                 gpu.getKernel("Matrices::matrixMultiply") != null &&
                 gpu.getKernel("Matrices::addRowToRows") != null &&
-                gpu.getKernel("Matrices::relu") != null;
+                gpu.getKernel("Matrices::addColToCols") != null &&
+                gpu.getKernel("Matrices::relu") != null &&
+                gpu.getKernel("Matrices::horizontalSoftmax") != null &&
+                gpu.getKernel("Matrices::verticalSoftmax") != null;
     }
 
     public Matrix multiply(GPU gpu, Matrix other) {
         if(cols != other.rows) {
-            return null;
+            final int[] dimensionsA = {rows, cols};
+            final int[] dimensionsB = {other.rows, other.cols};
+            throw new DimensionsMismatchException(dimensionsA, dimensionsB);
         }
 
         cl_context context = gpu.getContext();
@@ -200,7 +236,7 @@ public class Matrix {
         cl_kernel kernel = gpu.getKernel("Matrices::matrixMultiply");
 
         if(kernel == null) {
-            return null;
+            throw new NullPointerException("Matrices::matrixMultiply not found to be loaded in GPU");
         }
 
         Matrix result = new Matrix(rows, other.cols);
@@ -369,7 +405,7 @@ public class Matrix {
         cl_kernel kernel = gpu.getKernel("Matrices::relu");
 
         if(kernel == null) {
-            return null;
+            throw new NullPointerException("Matrices::relu not found to be loaded in GPU");
         }
 
         Matrix result = new Matrix(rows, cols);
@@ -409,13 +445,13 @@ public class Matrix {
         return result;
     }
 
-    public Matrix softmax(GPU gpu) {
+    public Matrix horizontalSoftmax(GPU gpu) {
         cl_context context = gpu.getContext();
         cl_command_queue commandQueue = gpu.getCommandQueue();
-        cl_kernel kernel = gpu.getKernel("Matrices::softmax");
+        cl_kernel kernel = gpu.getKernel("Matrices::horizontalSoftmax");
 
         if(kernel == null) {
-            return null;
+            throw new NullPointerException("Matrices::horizontalSoftmax not found to be loaded in GPU");
         }
 
         Matrix result = new Matrix(rows, cols);
@@ -440,6 +476,53 @@ public class Matrix {
         // Set the work-item dimensions
         long local_work_sizes[] = new long[]{1};
         long global_work_sizes[] = new long[]{rows};
+
+        // Execute the kernel
+        clEnqueueNDRangeKernel(commandQueue, kernel, 1, null,
+                global_work_sizes, local_work_sizes, 0, null, null);
+
+        // Read the output data
+        clEnqueueReadBuffer(commandQueue, memoryOut, CL_TRUE, 0,
+                result.data.length * Sizeof.cl_float, pointerOut, 0, null, null);
+
+        clReleaseMemObject(memoryIn);
+        clReleaseMemObject(memoryOut);
+
+        return result;
+    }
+
+    public Matrix verticalSoftmax(GPU gpu) {
+        cl_context context = gpu.getContext();
+        cl_command_queue commandQueue = gpu.getCommandQueue();
+        cl_kernel kernel = gpu.getKernel("Matrices::verticalSoftmax");
+
+        if(kernel == null) {
+            throw new NullPointerException("Matrices::verticalSoftmax not found to be loaded in GPU");
+        }
+
+        Matrix result = new Matrix(rows, cols);
+
+        Pointer pointerIn = Pointer.to(data);
+        Pointer pointerOut = Pointer.to(result.data);
+
+        // Allocate the memory objects for the input- and output data
+        cl_mem memoryIn = clCreateBuffer(context,
+                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                Sizeof.cl_float * data.length, pointerIn, null);
+        cl_mem memoryOut = clCreateBuffer(context,
+                CL_MEM_READ_WRITE,
+                Sizeof.cl_float * result.data.length, null, null);
+
+        // Set the arguments for the kernel
+        int argNum = 0;
+        clSetKernelArg(kernel, argNum++, Sizeof.cl_mem, Pointer.to(memoryOut));
+        clSetKernelArg(kernel, argNum++, Sizeof.cl_mem, Pointer.to(memoryIn));
+        clSetKernelArg(kernel, argNum++, Sizeof.cl_uint, Pointer.to(new int[]{cols}));
+        clSetKernelArg(kernel, argNum++, Sizeof.cl_uint, Pointer.to(new int[]{rows}));
+
+        // Set the work-item dimensions
+        long local_work_sizes[] = new long[]{1};
+        long global_work_sizes[] = new long[]{cols};
 
         // Execute the kernel
         clEnqueueNDRangeKernel(commandQueue, kernel, 1, null,

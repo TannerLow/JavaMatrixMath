@@ -106,10 +106,10 @@ relu(__global float* output,
     }
 }
 
-// Add row to rows: C = exp(A[i]) for all rows i.
-__kernel void softmax(__global float* output,
-                      __global float* input,
-                      const int rowSize)
+// Softmax each element of each row with all elements of that row
+__kernel void horizontalSoftmax(__global float* output,
+                                __global float* input,
+                                const int rowSize)
 {
     int globalRow = get_global_id(0);
 
@@ -135,6 +135,38 @@ __kernel void softmax(__global float* output,
     int index;
     for (int i = 0; i < rowSize; i++) {
         index = offset + i;
+        output[index] = exp(input[index] - max) / sum;
+    }
+}
+
+// Softmax each element of each column with all elements of that column
+__kernel void verticalSoftmax(__global float* output,
+                              __global float* input,
+                              const int rowSize,
+                              const int colSize)
+{
+    int globalCol = get_global_id(0);
+
+    // get the max value of the column
+    float max = -3.4028235E37f;
+    float value;
+    for (int i = 0; i < colSize; i++) {
+        value = input[globalCol + i * rowSize];
+        if(value > max) {
+            max = value;
+        }
+    }
+
+    // Calculate sum of exponentials of input elements
+    float sum = 0.0f;
+    for (int i = 0; i < colSize; i++) {
+        sum += exp(input[globalCol + i * rowSize] - max);
+    }
+
+    // Calculate softmax for each element
+    int index;
+    for (int i = 0; i < colSize; i++) {
+        index = globalCol + i * rowSize;
         output[index] = exp(input[index] - max) / sum;
     }
 }
