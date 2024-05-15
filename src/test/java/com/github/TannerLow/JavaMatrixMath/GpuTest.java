@@ -17,6 +17,7 @@ public class GpuTest {
 
             testMultiply();
             testAddRowToRows();
+            testAddColToCols();
             testRelu();
             testSoftmax();
         }
@@ -72,6 +73,27 @@ public class GpuTest {
         Matrix b = new Matrix(1,3, bData);
 
         Matrix result = a.addRowToRows(gpu, b);
+
+        if(result.rows != a.rows || result.cols != a.cols) {
+            throw new TestFailedException();
+        }
+
+        for(int i = 0; i < result.data.length; i++) {
+            if(!TestMath.withinMariginOfError(expected[i], result.data[i], 0.0005f)) {
+                throw new TestFailedException();
+            }
+        }
+    }
+
+    private static void testAddColToCols() {
+        float[] aData = {1,0,2,0,3,0};
+        float[] bData = {3,2,1};
+        float[] expected = {4,3,4,2,4,1};
+
+        Matrix a = new Matrix(3,2, aData);
+        Matrix b = new Matrix(3,1, bData);
+
+        Matrix result = a.addColToCols(b);
 
         if(result.rows != a.rows || result.cols != a.cols) {
             throw new TestFailedException();

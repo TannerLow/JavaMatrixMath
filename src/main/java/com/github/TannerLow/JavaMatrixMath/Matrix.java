@@ -81,11 +81,42 @@ public class Matrix {
         return result;
     }
 
+    public Matrix addColToCols(Matrix col) throws DimensionsMismatchException {
+        if(rows != col.rows) {
+            final int[] dimensionsA = {rows, cols};
+            final int[] dimensionsB = {col.rows, col.cols};
+            throw new DimensionsMismatchException(dimensionsA, dimensionsB);
+        }
+
+        Matrix result = new Matrix(rows, cols);
+
+        for(int row = 0; row < rows; row++) {
+            for(int currentCol = 0; currentCol < cols; currentCol++) {
+                int index = row * cols + currentCol;
+                result.data[index] = data[index] + col.data[row];
+            }
+        }
+
+        return result;
+    }
+
     public Matrix relu() {
         Matrix result = new Matrix(rows, cols);
 
         for(int i = 0; i < data.length; i++) {
             result.data[i] = Math.max(data[i], 0);
+        }
+
+        return result;
+    }
+
+    public Matrix vectorizedReluDerivative() {
+        Matrix result = new Matrix(rows, cols);
+
+        for(int i = 0; i < data.length; i++) {
+            if(data[i] > 0) {
+                result.data[i] = 1;
+            }
         }
 
         return result;
@@ -122,6 +153,35 @@ public class Matrix {
 
         return result;
     }
+
+//    public Matrix fastBatchSoftmaxDerivative(Matrix output) {
+//        Matrix partialDerivatives = new Matrix(cols, cols);
+//
+//        // for each set of output features
+//        for(int outputRow = 0; outputRow < output.rows; outputRow++) {
+//            int offset = outputRow * cols;
+//            // for each output feature in the set
+//            for(int i = 0; i < cols; i++) {
+//                float valueI = output.data[offset + i];
+//                // for each input feature in the set
+//                for(int j = 0; j < cols; j++) {
+//                    float valueJ = output.data[offset + j];
+//                    if(i == j) {
+//                        partialDerivatives.data[i * cols + j] += valueI * (1 - valueI);
+//                    }
+//                    else {
+//                        partialDerivatives.data[i * cols + j] += -valueI * valueJ;
+//                    }
+//                }
+//            }
+//        }
+//
+//        for(int i = 0; i < partialDerivatives.data.length; i++) {
+//            partialDerivatives.data[i] /= output.rows;
+//        }
+//
+//        return partialDerivatives;
+//    }
 
     public static boolean isCompatibleWithGPU(GPU gpu) {
         return  gpu.isInitialized() &&
@@ -189,7 +249,9 @@ public class Matrix {
 
     public Matrix addRowToRows(GPU gpu, Matrix row) {
         if(cols != row.cols) {
-            return null;
+            final int[] dimensionsA = {rows, cols};
+            final int[] dimensionsB = {row.rows, row.cols};
+            throw new DimensionsMismatchException(dimensionsA, dimensionsB);
         }
 
         cl_context context = gpu.getContext();
@@ -197,7 +259,7 @@ public class Matrix {
         cl_kernel kernel = gpu.getKernel("Matrices::addRowToRows");
 
         if(kernel == null) {
-            return null;
+            throw new NullPointerException("Matrices::addRowToRows not found to be loaded in GPU");
         }
 
         Matrix result = new Matrix(rows, cols);
@@ -213,6 +275,64 @@ public class Matrix {
         cl_mem memoryB = clCreateBuffer(context,
                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                 Sizeof.cl_float * row.data.length, pointerB, null);
+        cl_mem memoryOut = clCreateBuffer(context,
+                CL_MEM_READ_WRITE,
+                Sizeof.cl_float * result.data.length, null, null);
+
+        // Set the arguments for the kernel
+        int argNum = 0;
+        clSetKernelArg(kernel, argNum++, Sizeof.cl_mem, Pointer.to(memoryOut));
+        clSetKernelArg(kernel, argNum++, Sizeof.cl_mem, Pointer.to(memoryA));
+        clSetKernelArg(kernel, argNum++, Sizeof.cl_mem, Pointer.to(memoryB));
+        clSetKernelArg(kernel, argNum++, Sizeof.cl_uint, Pointer.to(new int[]{cols}));
+
+        // Set the work-item dimensions
+        long local_work_sizes[] = new long[]{1};
+        long global_work_sizes[] = new long[]{rows};
+
+        // Execute the kernel
+        clEnqueueNDRangeKernel(commandQueue, kernel, 1, null,
+                global_work_sizes, local_work_sizes, 0, null, null);
+
+        // Read the output data
+        clEnqueueReadBuffer(commandQueue, memoryOut, CL_TRUE, 0,
+                result.data.length * Sizeof.cl_float, pointerOut, 0, null, null);
+
+        clReleaseMemObject(memoryA);
+        clReleaseMemObject(memoryB);
+        clReleaseMemObject(memoryOut);
+
+        return result;
+    }
+
+    public Matrix addColToCols(GPU gpu, Matrix col) {
+        if(rows != col.rows) {
+            final int[] dimensionsA = {rows, cols};
+            final int[] dimensionsB = {col.rows, col.cols};
+            throw new DimensionsMismatchException(dimensionsA, dimensionsB);
+        }
+
+        cl_context context = gpu.getContext();
+        cl_command_queue commandQueue = gpu.getCommandQueue();
+        cl_kernel kernel = gpu.getKernel("Matrices::addColToCols");
+
+        if(kernel == null) {
+            throw new NullPointerException("Matrices::addColToCols not found to be loaded in GPU");
+        }
+
+        Matrix result = new Matrix(rows, cols);
+
+        Pointer pointerA = Pointer.to(data);
+        Pointer pointerB = Pointer.to(col.data);
+        Pointer pointerOut = Pointer.to(result.data);
+
+        // Allocate the memory objects for the input- and output data
+        cl_mem memoryA = clCreateBuffer(context,
+                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                Sizeof.cl_float * data.length, pointerA, null);
+        cl_mem memoryB = clCreateBuffer(context,
+                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                Sizeof.cl_float * col.data.length, pointerB, null);
         cl_mem memoryOut = clCreateBuffer(context,
                 CL_MEM_READ_WRITE,
                 Sizeof.cl_float * result.data.length, null, null);

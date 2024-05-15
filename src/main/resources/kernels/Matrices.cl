@@ -55,14 +55,34 @@ addRowToRows(__global float* C,
 {
     int globalRow = get_global_id(0);
 
+    int offset = globalRow * rowSize;
+
     // one thread per row
     for (int i = 0; i < rowSize; i++)
     {
-        C[globalRow * rowSize + i] = A[globalRow * rowSize + i] + B[i];
+        C[offset + i] = A[offset + i] + B[i];
     }
 }
 
-// Add row to rows: output = ReLu(A).
+// Add col to cols: C = A[i][j] + B, for all cols j.
+__kernel void
+addColToCols(__global float* C,
+             __global float* A,
+             __global float* B,
+             const int rowSize)
+{
+    int globalRow = get_global_id(0);
+
+    int offset = globalRow * rowSize;
+
+    // one thread per row of A
+    for (int i = 0; i < rowSize; i++)
+    {
+        C[offset + i] = A[offset + i] + B[globalRow];
+    }
+}
+
+// Relu: output = ReLu(A).
 __kernel void
 relu(__global float* output,
      __global float* input,
