@@ -62,6 +62,7 @@ public class GpuTest {
 
         for(int i = 0; i < result.data.length; i++) {
             if(!TestMath.withinMariginOfError(expected[i], result.data[i], 0.0005f)) {
+                System.out.println(expected[i] + " vs " + result.data[i]);
                 throw new TestFailedException();
             }
         }

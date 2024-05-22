@@ -55,7 +55,7 @@ public class Matrix {
                 for(int col = 0; col < this.cols; col++) {
                     sum += data[row * this.cols + col] * other.data[col * other.cols + otherCol];
                 }
-                result.data[row * result.rows + otherCol] = sum;
+                result.data[row * result.cols + otherCol] = sum;
             }
         }
 
@@ -266,7 +266,7 @@ public class Matrix {
 
         // Set the work-item dimensions
         long local_work_sizes[] = new long[]{1, 1};
-        long global_work_sizes[] = new long[]{rows, cols};
+        long global_work_sizes[] = new long[]{rows, other.cols};
 
         // Execute the kernel
         clEnqueueNDRangeKernel(commandQueue, kernel, 2, null,
